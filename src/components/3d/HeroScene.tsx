@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, Environment } from '@react-three/drei';
+import { Float } from '@react-three/drei';
 import * as THREE from 'three';
 import { SciFiMonolith } from './SciFiMonolith';
 import { ParticleField } from './ParticleField';
@@ -18,32 +18,7 @@ const CameraRig: React.FC<{ isMobile: boolean; reducedMotion: boolean }> = ({ is
   return null;
 };
 
-class EnvironmentErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    console.warn('[HeroScene] Environment HDR load failed (network/CDN unavailable), falling back to procedural lights:', error.message);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <>
-          <directionalLight position={[-5, 5, -5]} intensity={0.5} color="#06b6d4" />
-          <ambientLight intensity={0.8} />
-        </>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 export const HeroScene: React.FC<{ videoUrl?: string; posterUrl?: string }> = ({ videoUrl, posterUrl }) => {
   const [mounted, setMounted] = useState(false);
@@ -124,19 +99,18 @@ export const HeroScene: React.FC<{ videoUrl?: string; posterUrl?: string }> = ({
         }}
         className="w-full h-full relative z-10"
       >
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={0.6} />
         <directionalLight position={[10, 12, 8]} intensity={1.8} color="#ffffff" castShadow />
-        <pointLight position={[-12, -8, -6]} intensity={1.2} color="#06b6d4" />
-        <pointLight position={[12, 8, -6]} intensity={1.2} color="#3b82f6" />
+        <directionalLight position={[-10, -10, -5]} intensity={0.6} color="#06b6d4" />
+        <pointLight position={[-12, -8, -6]} intensity={1.5} color="#06b6d4" />
+        <pointLight position={[12, 8, -6]} intensity={1.5} color="#3b82f6" />
+        <hemisphereLight intensity={0.4} color="#06b6d4" groundColor="#0f172a" />
 
         <Suspense fallback={null}>
           <Float speed={reducedMotion ? 0 : 1.2} rotationIntensity={0.25} floatIntensity={0.4}>
             <SciFiMonolith />
           </Float>
           {particleCount > 0 && <ParticleField count={particleCount} />}
-          <EnvironmentErrorBoundary>
-            <Environment preset="night" />
-          </EnvironmentErrorBoundary>
         </Suspense>
 
         <CameraRig isMobile={deviceTier === 'mobile'} reducedMotion={reducedMotion} />
