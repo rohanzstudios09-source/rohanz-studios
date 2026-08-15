@@ -115,7 +115,7 @@ BEGIN
         WHERE user_id = auth.uid() AND role = 'admin'
       ) OR EXISTS (
         SELECT 1 FROM auth.users
-        WHERE id = auth.uid() AND lower(email) = 'rohanzstudios09@gmail.com'
+        WHERE id = auth.uid() AND lower(email) = lower(current_setting('app.settings.admin_email', true))
       )
     )
   );
@@ -149,9 +149,12 @@ CREATE POLICY "Admin write for game_features" ON public.game_features FOR ALL US
 CREATE POLICY "Admin write for game_technologies" ON public.game_technologies FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 CREATE POLICY "Admin write for devlogs" ON public.devlogs FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 CREATE POLICY "Admin update site_settings" ON public.site_settings FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Admin select/update contact_messages" ON public.contact_messages FOR SELECT USING (public.is_admin());
+CREATE POLICY "Admin select contact_messages" ON public.contact_messages FOR SELECT USING (public.is_admin());
 CREATE POLICY "Admin manage contact_messages" ON public.contact_messages FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Admin profiles self read" ON public.admin_profiles FOR SELECT USING (auth.role() = 'authenticated');
+
+-- Admin Profiles Hardening: Self read for authenticated users, modification strictly restricted to existing admins
+CREATE POLICY "Admin profiles read" ON public.admin_profiles FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Admin profiles write restricted" ON public.admin_profiles FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 -- 6. Storage Buckets Setup (Run in SQL editor)
 INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', true) ON CONFLICT DO NOTHING;

@@ -16,7 +16,9 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import { signOutAdmin } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 const ADMIN_LINKS = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -29,7 +31,17 @@ const ADMIN_LINKS = [
 
 export const AdminSidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogoutClick = async () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      await signOutAdmin();
+      router.push('/admin');
+    }
+  };
 
   const sidebarContent = (
     <div className="flex flex-col justify-between h-full">
@@ -77,17 +89,15 @@ export const AdminSidebar: React.FC<{ onLogout?: () => void }> = ({ onLogout }) 
           <span>VIEW MAIN SITE</span>
           <ExternalLink className="w-3.5 h-3.5" />
         </Link>
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            className="flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl bg-rose-950/30 border border-rose-500/20 text-xs font-mono text-rose-400 hover:bg-rose-950/60 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center gap-2">
-              <LogOut className="w-4 h-4" />
-              <span>LOGOUT</span>
-            </div>
-          </button>
-        )}
+        <button
+          onClick={handleLogoutClick}
+          className="flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl bg-rose-950/30 border border-rose-500/20 text-xs font-mono text-rose-400 hover:bg-rose-950/60 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <LogOut className="w-4 h-4" />
+            <span>LOGOUT</span>
+          </div>
+        </button>
       </div>
     </div>
   );

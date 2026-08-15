@@ -15,33 +15,49 @@ function cleanErrorMessage(err: unknown): string {
   return msg;
 }
 
+function sanitizeText(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { name, email, message } = body;
 
-    // 1. Input Validation
-    if (!name || typeof name !== 'string' || !name.trim() ||
-        !email || typeof email !== 'string' || !email.trim() ||
-        !message || typeof message !== 'string' || !message.trim()) {
+    // 1. Input Validation & Strict Bounds Check
+    if (!name || typeof name !== 'string' || !name.trim() || name.trim().length > 100 ||
+        !email || typeof email !== 'string' || !email.trim() || email.trim().length > 254 ||
+        !message || typeof message !== 'string' || !message.trim() || message.trim().length > 5000) {
       return NextResponse.json(
-        { success: false, error: 'Valid name, email, and message are required.' },
+        { success: false, error: 'Valid name, email (max 254 chars), and message (max 5000 chars) are required.' },
         { status: 400 }
       );
     }
 
-    const cleanName = name.trim();
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return NextResponse.json(
+        { success: false, error: 'Please provide a valid email address format.' },
+        { status: 400 }
+      );
+    }
+
+    const cleanName = sanitizeText(name.trim());
     const cleanEmail = email.trim();
-    const cleanMessage = message.trim();
+    const cleanMessage = sanitizeText(message.trim());
     const timestamp = new Date().toISOString();
 
     let dbSaved = false;
-    let dbError = '';
 
-    // 2. Check for invalid Dashboard URL in env
-    if (supabaseUrl.includes('/dashboard/') || supabaseUrl.includes('app.supabase.com')) {
-      dbError = 'NEXT_PUBLIC_SUPABASE_URL in .env.local is set to your Supabase Dashboard URL instead of your API Project URL (https://<project-ref>.supabase.co). Please update your .env.local file.';
-    } else if (supabaseUrl && supabaseServiceKey && !supabaseUrl.includes('your-project')) {
+    // 2. Database Insertion
+    if (supabaseUrl && supabaseServiceKey && !supabaseUrl.includes('your-project') && !supabaseUrl.includes('/dashboard/')) {
       try {
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
         const { error } = await supabase.from('contact_messages').insert([
@@ -55,31 +71,20 @@ export async function POST(request: Request) {
         ]);
 
         if (error) {
-          const formattedErr = cleanErrorMessage(error.message);
-          console.error('[Contact API] Supabase database insert error:', formattedErr);
-          dbError = formattedErr;
+          console.error('[Contact API] Supabase database insert error:', cleanErrorMessage(error.message));
         } else {
           dbSaved = true;
         }
       } catch (dbErr: unknown) {
-        const formattedErr = cleanErrorMessage(dbErr);
-        console.error('[Contact API] Supabase exception:', formattedErr);
-        dbError = formattedErr;
+        console.error('[Contact API] Supabase exception:', cleanErrorMessage(dbErr));
       }
     } else {
-      console.log('[Contact API] Local development mode - Simulated DB insertion:', {
-        name: cleanName,
-        email: cleanEmail,
-        message: cleanMessage,
-        timestamp,
-      });
       dbSaved = true;
     }
 
     // 3. Send Notification Email via Resend if RESEND_API_KEY is configured
     const resendApiKey = process.env.RESEND_API_KEY;
     let emailSent = false;
-    let emailError = '';
 
     if (resendApiKey && !resendApiKey.includes('your_resend_api_key')) {
       try {
@@ -122,43 +127,23 @@ export async function POST(request: Request) {
           }),
         });
 
-        const resendData = await resendRes.json();
-
         if (resendRes.ok) {
           emailSent = true;
-          console.log('[Contact API] Resend email dispatched successfully:', resendData.id);
-        } else {
-          emailError = resendData.message || resendData.name || 'Resend API error';
-          console.warn('[Contact API] Resend returned non-200 response:', resendData);
         }
       } catch (emailErr: unknown) {
-        const msg = emailErr instanceof Error ? emailErr.message : 'Resend request failed.';
-        emailError = msg;
         console.error('[Contact API] Failed to deliver notification email via Resend:', emailErr);
       }
-    } else {
-      console.log(`[Contact API] RESEND_API_KEY not configured in environment. Simulated email dispatch to ${targetEmail}`);
-    }
-
-    // 4. Return Contact Flow Consistency Status
-    if (!dbSaved && dbError) {
-      return NextResponse.json(
-        { success: false, error: dbError },
-        { status: 500 }
-      );
     }
 
     return NextResponse.json({
       success: true,
       dbSaved,
       emailSent,
-      emailError: emailError || undefined,
-      targetEmail,
     });
   } catch (err: unknown) {
-    const errorMsg = cleanErrorMessage(err);
+    console.error('[Contact API] Unexpected error:', err);
     return NextResponse.json(
-      { success: false, error: errorMsg },
+      { success: false, error: 'Transmission processing failed.' },
       { status: 500 }
     );
   }

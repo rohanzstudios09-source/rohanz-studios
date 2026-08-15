@@ -192,13 +192,7 @@ export const signInAdmin = async (
   password: string
 ): Promise<{ success: boolean; error?: string }> => {
   if (!supabase) {
-    if (email.toLowerCase() === 'rohanzstudios09@gmail.com' || email.includes('@')) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rohanz_admin_session', 'true');
-      }
-      return { success: true };
-    }
-    return { success: false, error: 'Invalid credentials.' };
+    return { success: false, error: 'Supabase client is not configured.' };
   }
 
   try {
@@ -208,9 +202,6 @@ export const signInAdmin = async (
     }
 
     if (data.session) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rohanz_admin_session', 'true');
-      }
       return { success: true };
     }
 
@@ -222,9 +213,6 @@ export const signInAdmin = async (
 };
 
 export const signOutAdmin = async (): Promise<void> => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('rohanz_admin_session');
-  }
   if (supabase) {
     await supabase.auth.signOut();
   }
@@ -232,8 +220,7 @@ export const signOutAdmin = async (): Promise<void> => {
 
 export const resetPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
   if (!supabase) {
-    console.log('[Mock Auth] Password reset requested for:', email);
-    return { success: true };
+    return { success: false, error: 'Supabase client is not configured.' };
   }
 
   try {
@@ -248,17 +235,27 @@ export const resetPassword = async (email: string): Promise<{ success: boolean; 
 };
 
 export const getAdminSession = async (): Promise<boolean> => {
-  if (typeof window === 'undefined') return false;
-  const localFlag = localStorage.getItem('rohanz_admin_session') === 'true';
-
-  if (!supabase) return localFlag;
+  if (!supabase) return false;
 
   try {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) return true;
-    return localFlag;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return false;
+
+    // Verify if current user email matches admin config or role
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'rohanzstudios09@gmail.com';
+    if (session.user.email?.toLowerCase() === adminEmail.toLowerCase()) {
+      return true;
+    }
+
+    const { data: profile } = await supabase
+      .from('admin_profiles')
+      .select('role')
+      .eq('user_id', session.user.id)
+      .single();
+
+    return profile?.role === 'admin';
   } catch {
-    return localFlag;
+    return false;
   }
 };
 
@@ -397,10 +394,22 @@ export const uploadStorageFile = async (
     return { success: false, error: 'Supabase client is not configured.' };
   }
 
+  // Defensive Upload Hardening: Allowed MIME types & max size limit (5 MB)
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+  if (!allowedMimeTypes.includes(file.type.toLowerCase())) {
+    return { success: false, error: 'Invalid file type. Only JPEG, PNG, WEBP, GIF, and SVG images are permitted.' };
+  }
+
+  const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return { success: false, error: 'File size exceeds maximum permitted limit of 5 MB.' };
+  }
+
   try {
-    const fileExt = file.name.split('.').pop() || 'png';
-    const cleanName = file.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const filePath = `${Date.now()}_${cleanName}.${fileExt}`;
+    const rawExt = file.name.split('.').pop() || 'png';
+    const fileExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanBaseName = file.name.substring(0, file.name.lastIndexOf('.')).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filePath = `${Date.now()}_${cleanBaseName}.${fileExt}`;
 
     const { data, error } = await supabase.storage.from(bucket).upload(filePath, file, {
       cacheControl: '3600',
