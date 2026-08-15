@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import { Game, Devlog, SiteSettings, ContactMessage } from '@/types';
 import { MOCK_GAMES, MOCK_DEVLOGS, MOCK_MESSAGES } from '@/lib/mock-data';
 import { siteConfig } from '@/config/siteConfig';
@@ -25,7 +25,7 @@ export const isSupabaseConfigured = Boolean(
 );
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createBrowserClient(supabaseUrl, supabaseAnonKey)
   : null;
 
 // ==========================================
@@ -238,19 +238,19 @@ export const getAdminSession = async (): Promise<boolean> => {
   if (!supabase) return false;
 
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return false;
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return false;
 
     // Verify if current user email matches admin config or role
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'rohanzstudios09@gmail.com';
-    if (session.user.email?.toLowerCase() === adminEmail.toLowerCase()) {
+    if (user.email?.toLowerCase() === adminEmail.toLowerCase()) {
       return true;
     }
 
     const { data: profile } = await supabase
       .from('admin_profiles')
       .select('role')
-      .eq('user_id', session.user.id)
+      .eq('user_id', user.id)
       .single();
 
     return profile?.role === 'admin';

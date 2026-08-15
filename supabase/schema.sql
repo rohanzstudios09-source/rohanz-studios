@@ -113,9 +113,11 @@ BEGIN
       EXISTS (
         SELECT 1 FROM public.admin_profiles
         WHERE user_id = auth.uid() AND role = 'admin'
-      ) OR EXISTS (
+      ) OR 
+      lower(auth.jwt() ->> 'email') = lower(coalesce(nullif(current_setting('app.settings.admin_email', true), ''), 'rohanzstudios09@gmail.com'))
+      OR EXISTS (
         SELECT 1 FROM auth.users
-        WHERE id = auth.uid() AND lower(email) = lower(current_setting('app.settings.admin_email', true))
+        WHERE id = auth.uid() AND lower(email) = lower(coalesce(nullif(current_setting('app.settings.admin_email', true), ''), 'rohanzstudios09@gmail.com'))
       )
     )
   );
