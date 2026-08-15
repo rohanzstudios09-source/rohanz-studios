@@ -18,6 +18,33 @@ const CameraRig: React.FC<{ isMobile: boolean; reducedMotion: boolean }> = ({ is
   return null;
 };
 
+class EnvironmentErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn('[HeroScene] Environment HDR load failed (network/CDN unavailable), falling back to procedural lights:', error.message);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <>
+          <directionalLight position={[-5, 5, -5]} intensity={0.5} color="#06b6d4" />
+          <ambientLight intensity={0.8} />
+        </>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const HeroScene: React.FC<{ videoUrl?: string; posterUrl?: string }> = ({ videoUrl, posterUrl }) => {
   const [mounted, setMounted] = useState(false);
   const [webglSupported, setWebglSupported] = useState(true);
@@ -107,7 +134,9 @@ export const HeroScene: React.FC<{ videoUrl?: string; posterUrl?: string }> = ({
             <SciFiMonolith />
           </Float>
           {particleCount > 0 && <ParticleField count={particleCount} />}
-          <Environment preset="night" />
+          <EnvironmentErrorBoundary>
+            <Environment preset="night" />
+          </EnvironmentErrorBoundary>
         </Suspense>
 
         <CameraRig isMobile={deviceTier === 'mobile'} reducedMotion={reducedMotion} />

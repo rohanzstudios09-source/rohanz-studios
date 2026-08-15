@@ -105,14 +105,14 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" className="dark scroll-smooth">
+    <html lang="en" className="dark scroll-smooth" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
       </head>
-      <body className="bg-[#060709] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500/30 selection:text-white">
+      <body className="bg-[#060709] text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500/30 selection:text-white" suppressHydrationWarning>
         <LoadingScreen />
         <CustomCursor />
         <Navbar />
